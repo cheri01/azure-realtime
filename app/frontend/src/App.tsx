@@ -63,6 +63,34 @@ function App() {
 
     const { t } = useTranslation();
 
+    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            const formData = new FormData();
+            formData.append("file", file);
+
+            try {
+                const response = await fetch("/upload_pdf", {
+                    method: "POST",
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const newFile: GroundingFile = {
+                        id: file.name,
+                        name: file.name,
+                        content: await file.text()
+                    };
+                    setGroundingFiles(prev => [...prev, newFile]);
+                } else {
+                    console.error("Failed to upload file");
+                }
+            } catch (error) {
+                console.error("Error uploading file:", error);
+            }
+        }
+    };
+
     return (
         <div className="flex min-h-screen flex-col bg-gray-100 text-gray-900">
             <div className="p-4 sm:absolute sm:left-4 sm:top-4">
@@ -91,6 +119,7 @@ function App() {
                     </Button>
                     <StatusMessage isRecording={isRecording} />
                 </div>
+                <input type="file" accept="application/pdf" onChange={handleFileUpload} />
                 <GroundingFiles files={groundingFiles} onSelected={setSelectedFile} />
             </main>
 

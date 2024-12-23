@@ -8,6 +8,8 @@ from azure.search.documents.models import VectorizableTextQuery
 
 from rtmt import RTMiddleTier, Tool, ToolResult, ToolResultDirection
 
+import fitz  # PyMuPDF
+
 _search_tool_schema = {
     "type": "function",
     "name": "search",
@@ -100,6 +102,20 @@ async def _report_grounding_tool(search_client: SearchClient, identifier_field: 
         docs.append({"chunk_id": r[identifier_field], "title": r[title_field], "chunk": r[content_field]})
     return ToolResult({"sources": docs}, ToolResultDirection.TO_CLIENT)
 
+async def _process_pdf(file_path: str) -> str:
+    doc = fitz.open(file_path)
+    text = ""
+    for page in doc:
+        text += page.get_text()
+    return text
+
+async def _index_pdf_text(search_client: SearchClient, text: str, identifier: str) -> None:
+    doc = {
+        "chunk_id": identifier,
+        "chunk": text
+    }
+    await search_client.upload_documents(documents=[doc])
+
 def attach_rag_tools(rtmt: RTMiddleTier,
     credentials: AzureKeyCredential | DefaultAzureCredential,
     search_endpoint: str, search_index: str,
@@ -116,3 +132,5 @@ def attach_rag_tools(rtmt: RTMiddleTier,
 
     rtmt.tools["search"] = Tool(schema=_search_tool_schema, target=lambda args: _search_tool(search_client, semantic_configuration, identifier_field, content_field, embedding_field, use_vector_query, args))
     rtmt.tools["report_grounding"] = Tool(schema=_grounding_tool_schema, target=lambda args: _report_grounding_tool(search_client, identifier_field, title_field, content_field, args))
+    rtmt.tools["process_pdf"] = Tool(target=lambda args: _process_pdf(args["file_path"]))
+    rtmt.tools["index_pdf_text"] = Tool(target=lambda args: _index_pdf_text(search_client, args["text"], args["identifier"]))
