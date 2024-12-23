@@ -64,6 +64,27 @@ async def create_app():
     current_directory = Path(__file__).parent
     app.add_routes([web.get('/', lambda _: web.FileResponse(current_directory / 'static/index.html'))])
     app.router.add_static('/', path=current_directory / 'static', name='static')
+
+    # P991b, Pc6ed, P50c2, P1ddb
+    async def handle_pdf_upload(request):
+        reader = await request.multipart()
+        field = await reader.next()
+        assert field.name == 'file'
+        filename = field.filename
+        size = 0
+        with open(os.path.join('uploads', filename), 'wb') as f:
+            while True:
+                chunk = await field.read_chunk()
+                if not chunk:
+                    break
+                size += len(chunk)
+                f.write(chunk)
+        logger.info(f'Saved {filename} ({size} bytes)')
+        # Trigger processing of uploaded PDFs
+        # P1ddb: Add code to trigger processing of uploaded PDFs
+        return web.Response(text=f'Successfully uploaded {filename}')
+
+    app.router.add_post('/upload_pdf', handle_pdf_upload)
     
     return app
 
